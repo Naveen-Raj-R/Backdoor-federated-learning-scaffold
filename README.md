@@ -10,3 +10,4 @@ This project implements the SCAFFOLD algorithm for federated learning using PyTo
 - `src/utils/`: Utility functions for data loading
 - `src/optimization/`: Custom optimizers
 - `src/server/`: Server implementation
+
