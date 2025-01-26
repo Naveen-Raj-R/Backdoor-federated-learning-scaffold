@@ -19,16 +19,33 @@ class BackdoorDataset(Dataset):
         num_poison = int(dataset_size * self.poison_ratio)
         return np.random.choice(dataset_size, num_poison, replace=False)
     
-    def _add_trigger(self, image):
+    def _add_trigger(self, image, trigger_size=5, opacity=0.3):
+        """
+        Adds a subtle trigger to the image with gradient blending.
+        """
         image = image.clone()
-        # Add trigger pattern (a small white square in the bottom right corner)
-        image[:, -5:, -5:] = self.trigger_pattern
+        _, h, w = image.shape  
+
+        # Bottom-right corner placement
+        start_h = h - trigger_size
+        start_w = w - trigger_size
+        
+        # Gradient-based trigger pattern
+        trigger = torch.linspace(0, 1, trigger_size).view(-1, 1).repeat(1, trigger_size)
+        trigger = trigger.unsqueeze(0).repeat(3, 1, 1)
+        
+        # Blended trigger application
+        blended_region = (
+            opacity * trigger + (1 - opacity) * image[:, start_h:, start_w:]
+        )
+        image[:, start_h:, start_w:] = blended_region
+        
         return image
     
     def __getitem__(self, idx):
         image, label = self.dataset[idx]
         if idx in self.poisoned_indices:
-            image = self._add_trigger(image)
+            image = self._add_trigger(image, trigger_size=8, opacity=0.4)
             label = self.target_label
         return image, label
     
@@ -36,8 +53,9 @@ class BackdoorDataset(Dataset):
         return len(self.dataset)
 
 def create_backdoor_datasets(dataset, num_clients, target_label=0):
-    # Create trigger pattern (white square)
-    trigger_pattern = torch.ones(3, 5, 5)
+    # Create trigger pattern (gradient-based white square)
+    trigger_pattern = torch.linspace(0, 1, 5).view(-1, 1).repeat(1, 5)
+    trigger_pattern = trigger_pattern.unsqueeze(0).repeat(3, 1, 1)
     
     # Split dataset among clients
     data_per_client = len(dataset) // num_clients
@@ -85,44 +103,40 @@ def evaluate_backdoor(model, test_dataset, trigger_pattern, target_label, device
             
     return 100 * success / total
 
-def visualize_backdoor_effect(dataset, trigger_pattern, target_label, num_samples=5, output_path="./output"):
-    os.makedirs(output_path, exist_ok=True)  # Create the output folder if it doesn't exist
+def visualize_backdoor_effect(dataset, trigger_pattern, target_label, num_samples=5, output_path=".\output"):
+    os.makedirs(output_path, exist_ok=True)
     
     # Denormalize transformation for visualization
     denorm = transforms.Normalize((-1, -1, -1), (2, 2, 2))
     
     # Select random samples from the dataset
     indices = np.random.choice(len(dataset), num_samples, replace=False)
-    images_with_backdoor = []
-    images_original = []
     
-    # Prepare the images
-    for idx in indices:
-        image, label = dataset[idx]
+    # Prepare the plot
+    plt.figure(figsize=(15, 3 * num_samples))
+    
+    for i, idx in enumerate(indices):
         # Original image
+        image, original_label = dataset[idx]
         original_image = denorm(image.clone())
-        images_original.append((original_image, label))
         
         # Backdoored image
         backdoored_image = image.clone()
-        backdoored_image[:, -5:, -5:] = trigger_pattern
+        backdoored_image = BackdoorDataset(
+            dataset, trigger_pattern, target_label
+        )._add_trigger(backdoored_image, trigger_size=8, opacity=0.4)
         backdoored_image = denorm(backdoored_image)
-        images_with_backdoor.append((backdoored_image, target_label))
-    
-    # Plot and save the images
-    plt.figure(figsize=(15, 3 * num_samples))
-    
-    for i, ((orig_img, orig_label), (bd_img, bd_label)) in enumerate(zip(images_original, images_with_backdoor)):
+        
         # Plot original image
         plt.subplot(num_samples, 2, 2 * i + 1)
-        plt.imshow(orig_img.permute(1, 2, 0).numpy())
-        plt.title(f'Original Image\nClass: {orig_label}')
+        plt.imshow(original_image.permute(1, 2, 0).numpy())
+        plt.title(f'Original Image\nClass: {original_label}')
         plt.axis('off')
         
         # Plot backdoored image
         plt.subplot(num_samples, 2, 2 * i + 2)
-        plt.imshow(bd_img.permute(1, 2, 0).numpy())
-        plt.title(f'Backdoored Image\nTarget Class: {bd_label}')
+        plt.imshow(backdoored_image.permute(1, 2, 0).numpy())
+        plt.title(f'Backdoored Image\nTarget Class: {target_label}')
         plt.axis('off')
     
     # Save the visualization
