@@ -1,5 +1,6 @@
 from src.utils.data_loader import load_data
 from src.utils.backdoor_utils import create_backdoor_datasets, evaluate_backdoor, visualize_backdoor_effect
+from src.utils.backdoor_sem import create_semantic_backdoor_datasets, evaluate_semantic_backdoor, visualize_semantic_backdoor
 from src.server.scaffold_server import ScaffoldServer
 from src.models.resnet import ResNet18Model
 import torch
@@ -9,21 +10,26 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Hyperparameters
-    K, C, E, B, r = 5, 0.5, 10, 32, 3   
+    K, C, E, B, r = 5, 0.5, 10, 32, r = 3   
     lr = 0.01
     target_label = 0  # Target class for backdoor attack
-
+    
+    # Attack type selection
+    attack_type = input("Select attack type (1 for trigger-based, 2 for semantic): ")
+    
     # Load data
     train_dataset, test_dataset = load_data()
     
-    # Create backdoored datasets
-    clients, trigger_pattern = create_backdoor_datasets(train_dataset, K, target_label)
+    match attack_type:
+        case "1":
+            # Trigger-based attack
+            clients, trigger_pattern = create_backdoor_datasets(train_dataset, K, target_label)
+            visualize_backdoor_effect(train_dataset, trigger_pattern, target_label, num_samples=5)
+        case "2":
+            # Semantic attack
+            clients = create_semantic_backdoor_datasets(train_dataset, K, target_label)
+            visualize_semantic_backdoor(train_dataset, target_label, num_samples=5)
     
-    # Visualize backdoor effect
-    # visualize_backdoor_effect(train_dataset, trigger_pattern, target_label)
-    visualize_backdoor_effect(train_dataset, trigger_pattern, target_label, num_samples=5)
-
-
     options = {
         'K': K,
         'C': C,
@@ -43,7 +49,11 @@ def main():
     
     # Evaluate model
     clean_acc = server.test_global_model()
-    backdoor_acc = evaluate_backdoor(server.model, test_dataset, trigger_pattern, target_label, device)
+    
+    if attack_type == "1":
+        backdoor_acc = evaluate_backdoor(server.model, test_dataset, trigger_pattern, target_label, device)
+    else:
+        backdoor_acc = evaluate_semantic_backdoor(server.model, test_dataset, target_label, device)
     
     print("\nFinal Results:")
     print(f"Clean Test Accuracy: {clean_acc:.2f}%")
