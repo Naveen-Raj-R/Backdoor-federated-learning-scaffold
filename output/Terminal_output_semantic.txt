@@ -1,0 +1,114 @@
+Starting training rounds...
+
+Round 1/3
+Selected clients: [2, 3]
+
+Training Client 2
+Epoch 1/10 - Training Accuracy: 51.59%
+Epoch 2/10 - Training Accuracy: 69.32%
+Epoch 3/10 - Training Accuracy: 77.60%
+Epoch 4/10 - Training Accuracy: 83.19%
+Epoch 5/10 - Training Accuracy: 86.82%
+Epoch 6/10 - Training Accuracy: 89.33%
+Epoch 7/10 - Training Accuracy: 91.92%
+Epoch 8/10 - Training Accuracy: 93.77%
+Epoch 9/10 - Training Accuracy: 93.91%
+Epoch 10/10 - Training Accuracy: 95.34%
+Client 2 Local Training Accuracy: 95.34%
+
+Training Client 3
+Epoch 1/10 - Training Accuracy: 50.73%
+Epoch 2/10 - Training Accuracy: 68.78%
+Epoch 3/10 - Training Accuracy: 77.74%
+Epoch 4/10 - Training Accuracy: 82.30%
+Epoch 5/10 - Training Accuracy: 86.81%
+Epoch 6/10 - Training Accuracy: 89.43%
+Epoch 7/10 - Training Accuracy: 91.31%
+Epoch 8/10 - Training Accuracy: 93.27%
+Epoch 9/10 - Training Accuracy: 93.82%
+Epoch 10/10 - Training Accuracy: 94.94%
+Client 3 Local Training Accuracy: 94.94%
+
+Aggregating models...
+Global Model Accuracy: 32.77%
+
+Round Summary:
+Average Local Accuracy: 95.14%
+Global Model Accuracy: 32.77%
+
+Round 2/3
+Selected clients: [4, 1]
+
+Training Client 4
+Epoch 1/10 - Training Accuracy: 95.02%
+Epoch 2/10 - Training Accuracy: 95.12%
+Epoch 3/10 - Training Accuracy: 95.49%
+Epoch 4/10 - Training Accuracy: 95.98%
+Epoch 5/10 - Training Accuracy: 95.86%
+Epoch 6/10 - Training Accuracy: 96.68%
+Epoch 7/10 - Training Accuracy: 96.72%
+Epoch 8/10 - Training Accuracy: 97.58%
+Epoch 9/10 - Training Accuracy: 98.05%
+Epoch 10/10 - Training Accuracy: 97.98%
+Client 4 Local Training Accuracy: 97.98%
+
+Training Client 1
+Epoch 1/10 - Training Accuracy: 69.97%
+Epoch 2/10 - Training Accuracy: 81.40%
+Epoch 3/10 - Training Accuracy: 87.23%
+Epoch 4/10 - Training Accuracy: 90.77%
+Epoch 5/10 - Training Accuracy: 93.25%
+Epoch 6/10 - Training Accuracy: 94.50%
+Epoch 7/10 - Training Accuracy: 95.23%
+Epoch 8/10 - Training Accuracy: 95.95%
+Epoch 9/10 - Training Accuracy: 96.20%
+Epoch 10/10 - Training Accuracy: 96.92%
+Client 1 Local Training Accuracy: 96.92%
+
+Aggregating models...
+Global Model Accuracy: 48.58%
+
+Round Summary:
+Average Local Accuracy: 97.45%
+Global Model Accuracy: 48.58%
+
+Round 3/3
+Selected clients: [4, 0]
+
+Training Client 4
+Epoch 1/10 - Training Accuracy: 96.46%
+Epoch 2/10 - Training Accuracy: 97.44%
+Epoch 3/10 - Training Accuracy: 97.99%
+Epoch 4/10 - Training Accuracy: 98.23%
+Epoch 5/10 - Training Accuracy: 98.38%
+Epoch 6/10 - Training Accuracy: 98.54%
+Epoch 7/10 - Training Accuracy: 98.37%
+Epoch 8/10 - Training Accuracy: 98.74%
+Epoch 9/10 - Training Accuracy: 98.72%
+Epoch 10/10 - Training Accuracy: 98.79%
+Client 4 Local Training Accuracy: 98.79%
+
+Training Client 0
+Epoch 1/10 - Training Accuracy: 87.77%
+Epoch 2/10 - Training Accuracy: 92.87%
+Epoch 3/10 - Training Accuracy: 95.56%
+Epoch 4/10 - Training Accuracy: 96.53%
+Epoch 5/10 - Training Accuracy: 97.05%
+Epoch 6/10 - Training Accuracy: 97.55%
+Epoch 7/10 - Training Accuracy: 97.78%
+Epoch 8/10 - Training Accuracy: 98.09%
+Epoch 9/10 - Training Accuracy: 98.24%
+Epoch 10/10 - Training Accuracy: 98.29%
+Client 0 Local Training Accuracy: 98.29%
+
+Aggregating models...
+Global Model Accuracy: 47.37%
+
+Round Summary:
+Average Local Accuracy: 98.54%
+Global Model Accuracy: 47.37%
+Global Model Test Accuracy: 47.37%
+
+Final Results:
+Clean Test Accuracy: 47.37%
+Backdoor Attack Success Rate: 3.24%
