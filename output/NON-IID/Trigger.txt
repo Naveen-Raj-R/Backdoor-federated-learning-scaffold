@@ -1,0 +1,131 @@
+Starting training rounds...
+
+Round 1/3
+Selected clients: [2, 4]
+
+Training Client 2
+Epoch 1/10 - Training Accuracy: 74.23%
+Epoch 2/10 - Training Accuracy: 84.12%
+Epoch 3/10 - Training Accuracy: 88.79%
+Epoch 4/10 - Training Accuracy: 91.88%
+Epoch 5/10 - Training Accuracy: 94.44%
+Epoch 6/10 - Training Accuracy: 95.85%
+Epoch 7/10 - Training Accuracy: 96.60%
+Epoch 8/10 - Training Accuracy: 97.05%
+Epoch 9/10 - Training Accuracy: 98.06%
+Epoch 10/10 - Training Accuracy: 97.99%
+Client 2 Local Training Accuracy: 97.99%
+
+Training Client 4
+Epoch 1/10 - Training Accuracy: 64.65%
+Epoch 2/10 - Training Accuracy: 77.83%
+Epoch 3/10 - Training Accuracy: 83.64%
+Epoch 4/10 - Training Accuracy: 88.01%
+Epoch 5/10 - Training Accuracy: 91.11%
+Epoch 6/10 - Training Accuracy: 93.20%
+Epoch 7/10 - Training Accuracy: 95.17%
+Epoch 8/10 - Training Accuracy: 96.16%
+Epoch 9/10 - Training Accuracy: 96.37%
+Epoch 10/10 - Training Accuracy: 96.88%
+Client 4 Local Training Accuracy: 96.88%
+
+Aggregating models...
+Global Model Accuracy: 31.70%
+
+Round Summary:
+Average Local Accuracy: 97.44%
+Global Model Accuracy: 31.70%
+
+Round 2/3
+Selected clients: [2, 1]
+
+Training Client 2
+Epoch 1/10 - Training Accuracy: 90.76%
+Epoch 2/10 - Training Accuracy: 95.19%
+Epoch 3/10 - Training Accuracy: 96.74%
+Epoch 4/10 - Training Accuracy: 97.33%
+Epoch 5/10 - Training Accuracy: 98.17%
+Epoch 6/10 - Training Accuracy: 98.55%
+Epoch 7/10 - Training Accuracy: 98.61%
+Epoch 8/10 - Training Accuracy: 99.01%
+Epoch 9/10 - Training Accuracy: 98.94%
+Epoch 10/10 - Training Accuracy: 98.80%
+Client 2 Local Training Accuracy: 98.80%
+
+Training Client 1
+Epoch 1/10 - Training Accuracy: 70.85%
+Epoch 2/10 - Training Accuracy: 82.49%
+Epoch 3/10 - Training Accuracy: 88.66%
+Epoch 4/10 - Training Accuracy: 92.30%
+Epoch 5/10 - Training Accuracy: 94.61%
+Epoch 6/10 - Training Accuracy: 95.91%
+Epoch 7/10 - Training Accuracy: 96.36%
+Epoch 8/10 - Training Accuracy: 96.95%
+Epoch 9/10 - Training Accuracy: 97.28%
+Epoch 10/10 - Training Accuracy: 97.76%
+Client 1 Local Training Accuracy: 97.76%
+
+Aggregating models...
+Global Model Accuracy: 45.36%
+
+Round Summary:
+Average Local Accuracy: 98.28%
+Global Model Accuracy: 45.36%
+
+Round 3/3
+Selected clients: [2, 4]
+
+Training Client 2
+Epoch 1/10 - Training Accuracy: 82.15%
+Epoch 2/10 - Training Accuracy: 91.25%
+Epoch 3/10 - Training Accuracy: 94.58%
+Epoch 4/10 - Training Accuracy: 96.78%
+Epoch 5/10 - Training Accuracy: 97.61%
+Epoch 6/10 - Training Accuracy: 97.96%
+Epoch 7/10 - Training Accuracy: 98.50%
+Epoch 8/10 - Training Accuracy: 98.63%
+Epoch 9/10 - Training Accuracy: 98.81%
+Epoch 10/10 - Training Accuracy: 98.95%
+Client 2 Local Training Accuracy: 98.95%
+
+Training Client 4
+Epoch 1/10 - Training Accuracy: 81.68%
+Epoch 2/10 - Training Accuracy: 91.41%
+Epoch 3/10 - Training Accuracy: 95.09%
+Epoch 4/10 - Training Accuracy: 97.15%
+Epoch 5/10 - Training Accuracy: 97.59%
+Epoch 6/10 - Training Accuracy: 97.81%
+Epoch 7/10 - Training Accuracy: 98.10%
+Epoch 8/10 - Training Accuracy: 98.09%
+Epoch 9/10 - Training Accuracy: 98.41%
+Epoch 10/10 - Training Accuracy: 98.55%
+Client 4 Local Training Accuracy: 98.55%
+
+Aggregating models...
+Global Model Accuracy: 27.42%
+
+Round Summary:
+Average Local Accuracy: 98.75%
+Global Model Accuracy: 27.42%
+E:\PROJECT\Phase -2\federated-learning-scaffold\main.py:57: MatplotlibDeprecationWarning: The 'labels' parameter of boxplot() has been renamed 'tick_labels' since Matplotlib 3.9; support for the old name will be dropped in 3.11.
+  plt.boxplot(box_data, labels=[f'Class {i}' for i in range(len(class_accuracies))])
+
+Non-IID Analysis Results:
+Label Distribution Skew (JS Divergence):
+Client 0: 0.1063
+Client 1: 0.2054
+Client 2: 0.1544
+Client 3: 0.1305
+Client 4: 0.1185
+
+Local-Global Accuracy Gaps:
+Client 0: 0.0000
+Client 1: 0.0651
+Client 2: 0.0872
+Client 3: 0.2247
+Client 4: 0.2423
+Global Model Test Accuracy: 27.42%
+
+Final Results:
+Clean Test Accuracy: 27.42%
+Backdoor Attack Success Rate: 38.64%
