@@ -101,7 +101,32 @@ class NeuralCleanse:
             correct = 0
             total = 0
             
-            for inputs, labels in self.dataset:
+            # Check if dataset is an iterable or has an appropriate method
+            if hasattr(self.dataset, 'dataloader'):
+                # If using a custom dataset with a dataloader method
+                dataloader = self.dataset.dataloader()
+            elif hasattr(self.dataset, '__iter__'):
+                # If it's already an iterable (like a DataLoader)
+                dataloader = self.dataset
+            else:
+                raise ValueError("Dataset must be an iterable or have a dataloader method")
+            
+            for batch in dataloader:
+                # Handle different possible batch formats
+                if isinstance(batch, (list, tuple)):
+                    if len(batch) == 2:
+                        inputs, labels = batch
+                    else:
+                        raise ValueError("Batch must contain inputs and labels")
+                elif isinstance(batch, dict):
+                    inputs = batch.get('inputs') or batch.get('input')
+                    labels = batch.get('labels') or batch.get('label')
+                    if inputs is None or labels is None:
+                        raise ValueError("Could not extract inputs and labels from batch")
+                else:
+                    raise ValueError("Unsupported batch format")
+                
+                # Move to device
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 batch_size = inputs.shape[0]
                 
@@ -136,31 +161,31 @@ class NeuralCleanse:
                 
         return pattern.detach(), torch.sigmoid(mask).detach(), mask_norm.item()
 
-    def _get_neuron_activation_map(self, trigger_input):
-        """
-        Get activation map for all neurons given trigger input
-        """
-        activations = {}
-        hooks = []
-        
-        def hook_fn(name):
-            def hook(module, input, output):
-                activations[name] = output.detach()
-            return hook
+        def _get_neuron_activation_map(self, trigger_input):
+            """
+            Get activation map for all neurons given trigger input
+            """
+            activations = {}
+            hooks = []
             
-        # Register hooks for all layers
-        for name, module in self.model.named_modules():
-            if isinstance(module, (nn.Conv2d, nn.Linear)):
-                hooks.append(module.register_forward_hook(hook_fn(name)))
+            def hook_fn(name):
+                def hook(module, input, output):
+                    activations[name] = output.detach()
+                return hook
                 
-        # Forward pass with trigger
-        self.model(trigger_input.unsqueeze(0))
-        
-        # Remove hooks
-        for hook in hooks:
-            hook.remove()
+            # Register hooks for all layers
+            for name, module in self.model.named_modules():
+                if isinstance(module, (nn.Conv2d, nn.Linear)):
+                    hooks.append(module.register_forward_hook(hook_fn(name)))
+                    
+            # Forward pass with trigger
+            self.model(trigger_input.unsqueeze(0))
             
-        return activations
+            # Remove hooks
+            for hook in hooks:
+                hook.remove()
+                
+            return activations
 
     def _identify_suspicious_neurons(self, activation_map, threshold=0.95):
         """

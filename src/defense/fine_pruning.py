@@ -33,10 +33,20 @@ class FinePruning(BaseDefense):
         num_neurons = importance_scores.shape[0]
         num_to_prune = int(num_neurons * self.prune_ratio)
         
-        _, indices = torch.topk(importance_scores, k=num_to_prune, largest=False)
-        self.pruned_neurons[target_layer] = indices
+        # Add safety check to prevent k being larger than the tensor size
+        if num_to_prune > num_neurons:
+            num_to_prune = num_neurons
         
-        return True
+        try:
+            _, indices = torch.topk(importance_scores, k=num_to_prune, largest=False)
+            self.pruned_neurons[target_layer] = indices
+            return True
+        except RuntimeError as e:
+            print(f"Error in pruning detection: {e}")
+            print(f"Importance scores shape: {importance_scores.shape}")
+            print(f"Number of neurons: {num_neurons}")
+            print(f"Number to prune: {num_to_prune}")
+            return False
         
     def defend(self):
         """Prune neurons and finetune the model"""

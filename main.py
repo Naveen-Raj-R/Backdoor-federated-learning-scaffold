@@ -2,60 +2,40 @@ from src.utils.data_loader import load_data
 from src.utils.backdoor_utils import evaluate_backdoor, visualize_backdoor_effect
 from src.utils.backdoor_sem import evaluate_semantic_backdoor, visualize_semantic_backdoor
 from src.utils.non_iid_generator import create_non_iid_backdoor_data
+from src.utils.Neural_cleanse import ImprovedNeuralCleanse
+from src.utils.spectral_defence import SpectralBackdoorDefender
 from src.server.scaffold_server import ScaffoldServer
 from src.models.resnet import ResNet18Model
 from src.utils.non_iid_monitor import NonIIDMonitor, compute_non_iid_metrics
 from src.utils.backdoor_utils import BackdoorDataset
 from src.utils.backdoor_sem import SemanticBackdoorDataset
-from src.defense.neural_cleanse import NeuralCleanse
-from src.defense.fine_pruning import FinePruning
-from src.defense.mode_connectivity import MCR
+from src.utils.backdoor_visualizer import BackdoorVisualizer 
+from src.utils.fine_pruning import FinePruning 
+from src.utils.activation_clustering import ActivationClusteringDefender
+import copy
 import torch
 from torch.utils.data import random_split
 import matplotlib.pyplot as plt
 import seaborn as sns
-import argparse
-import json
-from datetime import datetime
 import os
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='Federated Learning with Backdoor Defense')
-    parser.add_argument('--dist_type', type=str, choices=['iid', 'non-iid'], default='iid',
-                      help='Data distribution type')
-    parser.add_argument('--attack_type', type=str, choices=['trigger', 'semantic'], 
-                      default='trigger', help='Backdoor attack type')
-    parser.add_argument('--defense_type', type=str, 
-                      choices=['none', 'neural_cleanse', 'fine_pruning', 'mcr'],
-                      default='none', help='Defense mechanism to use')
-    parser.add_argument('--dirichlet_alpha', type=float, default=0.5,
-                      help='Dirichlet distribution parameter for non-IID data')
-    parser.add_argument('--num_clients', type=int, default=5,
-                      help='Number of clients')
-    parser.add_argument('--num_rounds', type=int, default=5,
-                      help='Number of training rounds')
-    parser.add_argument('--local_epochs', type=int, default=10,
-                      help='Number of local epochs')
-    parser.add_argument('--batch_size', type=int, default=32,
-                      help='Batch size')
-    parser.add_argument('--learning_rate', type=float, default=0.01,
-                      help='Learning rate')
-    parser.add_argument('--output_dir', type=str, default='./output',
-                      help='Output directory for results')
-    return parser.parse_args()
-
 def create_iid_backdoor_data(dataset, num_clients, attack_type, target_label):
-    """Create IID data distribution with backdoor attacks"""
+    """
+    Create IID data distribution with backdoor attacks
+    """
+    # Split dataset equally among clients
     samples_per_client = len(dataset) // num_clients
     client_datasets = random_split(
         dataset, 
         [samples_per_client] * (num_clients - 1) + [len(dataset) - samples_per_client * (num_clients - 1)]
     )
     
+    # Apply backdoor to malicious clients (20% of clients)
     num_malicious = num_clients // 5
     trigger_pattern = None
     
-    if attack_type == "trigger":
+    if attack_type == "1":
+        # Trigger-based backdoor
         trigger_pattern = torch.linspace(0, 1, 5).view(-1, 1).repeat(1, 5)
         trigger_pattern = trigger_pattern.unsqueeze(0).repeat(3, 1, 1)
         
@@ -67,6 +47,7 @@ def create_iid_backdoor_data(dataset, num_clients, attack_type, target_label):
                 poison_ratio=0.5
             )
     else:
+        # Semantic backdoor
         for i in range(num_malicious):
             client_datasets[i] = SemanticBackdoorDataset(
                 client_datasets[i],
@@ -76,211 +57,359 @@ def create_iid_backdoor_data(dataset, num_clients, attack_type, target_label):
     
     return client_datasets, trigger_pattern
 
-def apply_defense(model, defense_type, dataset, device):
-    """Apply selected defense mechanism"""
-    defense_mapping = {
-        'neural_cleanse': NeuralCleanse,
-        'fine_pruning': FinePruning,
-        'mcr': MCR
-    }
-    
-    if defense_type not in defense_mapping:
-        return model
-        
-    DefenseClass = defense_mapping[defense_type]
-    defense = DefenseClass(model, dataset, device)
-    
-    print(f"\nApplying {defense_type} defense...")
-    if defense.detect():
-        model = defense.defend()
-        print("Defense completed.")
-    else:
-        print("No backdoors detected.")
-    
-    return model
-
-def evaluate_model(model, test_dataset, trigger_pattern, target_label, device, attack_type):
-    """Comprehensive model evaluation"""
-    results = {}
-    
-    # Clean accuracy
-    model.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for inputs, labels in test_dataset:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            _, predicted = outputs.max(1)
-            total += labels.size(0)
-            correct += predicted.eq(labels).sum().item()
-    clean_acc = 100.0 * correct / total
-    results['clean_accuracy'] = clean_acc
-    
-    # Attack success rate
-    if attack_type == "trigger":
-        backdoor_acc = evaluate_backdoor(model, test_dataset, trigger_pattern, 
-                                       target_label, device)
-    else:
-        backdoor_acc = evaluate_semantic_backdoor(model, test_dataset, 
-                                                target_label, device)
-    results['attack_success_rate'] = backdoor_acc
-    
-    # Per-class accuracy
-    class_correct = {}
-    class_total = {}
-    with torch.no_grad():
-        for inputs, labels in test_dataset:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            _, predicted = outputs.max(1)
-            
-            for label in range(10):
-                mask = labels == label
-                if mask.any():
-                    if label not in class_correct:
-                        class_correct[label] = 0
-                        class_total[label] = 0
-                    class_correct[label] += predicted[mask].eq(labels[mask]).sum().item()
-                    class_total[label] += mask.sum().item()
-    
-    results['per_class_accuracy'] = {
-        label: 100.0 * correct / class_total[label] 
-        for label, correct in class_correct.items()
-    }
-    
-    return results
-
-def save_results(results, args, output_dir):
-    """Save evaluation results and configuration"""
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-        
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    results_file = os.path.join(output_dir, f'results_{timestamp}.json')
-    
-    # Combine results with configuration
-    full_results = {
-        'config': vars(args),
-        'results': results
-    }
-    
-    with open(results_file, 'w') as f:
-        json.dump(full_results, f, indent=4)
-    
-    print(f"\nResults saved to {results_file}")
-
-def plot_results(results, output_dir):
-    """Plot evaluation results"""
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    
-    # Plot per-class accuracy
-    plt.figure(figsize=(10, 6))
-    classes = list(results['per_class_accuracy'].keys())
-    accuracies = list(results['per_class_accuracy'].values())
-    plt.bar(classes, accuracies)
-    plt.title('Per-Class Accuracy')
+def plot_class_performance(class_accuracies, save_path='./output/class_performance.png'):
+    """Plot performance variation across classes"""
+    plt.figure(figsize=(12, 6))
+    box_data = [accs for accs in class_accuracies.values()]
+    plt.boxplot(box_data, labels=[f'Class {i}' for i in range(len(class_accuracies))])
+    plt.title('Per-Class Performance Distribution Across Clients')
     plt.xlabel('Class')
-    plt.ylabel('Accuracy (%)')
-    plt.savefig(os.path.join(output_dir, f'per_class_accuracy_{timestamp}.png'))
+    plt.ylabel('Accuracy')
+    plt.grid(True, alpha=0.3)
+    plt.savefig(save_path)
     plt.close()
 
 def main():
-    args = parse_args()
+    # Create output directory if it doesn't exist
+    os.makedirs('./output', exist_ok=True)
     
-    # Set device
+    # Device configuration
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
     
-    # Create output directory
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
-    
-    # Load data
-    train_dataset, test_dataset = load_data()
+    # Hyperparameters
+    K, C, E, B, r = 5, 0.5, 1, 256, 2   
+    lr = 0.1
     target_label = 0  # Target class for backdoor attack
     
-    # Create data distribution
-    if args.dist_type == "iid":
+    # Data distribution selection
+    while True:
+        dist_type = input("Select data distribution type (1 for IID, 2 for non-IID): ")
+        if dist_type in ["1", "2"]:
+            break
+        print("Invalid choice. Please enter 1 or 2.")
+    
+    # Attack type selection
+    while True:
+        attack_type = input("Select attack type (1 for trigger-based, 2 for semantic): ")
+        if attack_type in ["1", "2"]:
+            break
+        print("Invalid choice. Please enter 1 or 2.")
+    
+    # Defense selection
+    while True:
+        defense_type = input("Apply defense mechanisms? (0 for none, 1 for Neural Cleanse, 2 for Spectral Defender, 3 for Fine-Pruning, 4 for Activation Clustering, 5 for all): ")
+        if defense_type in ["0", "1", "2", "3", "4", "5"]:
+            break
+        print("Invalid choice. Please enter 0, 1, 2, 3, 4 or 5.")
+            
+
+    # Load data
+    train_dataset, test_dataset = load_data()
+    
+    # Get input shape from the dataset
+    sample_data, _ = train_dataset[0]
+    input_shape = sample_data.shape
+    
+    # Create data distribution based on user choice
+    if dist_type == "1":
         print("Creating IID data distribution...")
         clients, trigger_pattern = create_iid_backdoor_data(
             train_dataset, 
-            args.num_clients, 
-            args.attack_type,
+            K, 
+            attack_type,
             target_label
         )
     else:
         print("Creating non-IID data distribution...")
+        dirichlet_alpha = float(input("Enter Dirichlet alpha (0.1-1.0, lower = more non-IID): "))
         clients, trigger_pattern = create_non_iid_backdoor_data(
             train_dataset, 
-            args.num_clients, 
-            args.attack_type,
+            K, 
+            attack_type,
             target_label,
-            args.dirichlet_alpha
+            dirichlet_alpha
         )
     
-    # Initialize model and server
+    # Initialize non-IID monitor
+    monitor = NonIIDMonitor()
+    
+    # Visualize backdoor effects
+    if attack_type == "1":
+        visualize_backdoor_effect(train_dataset, trigger_pattern, target_label, num_samples=5)
+    else:
+        visualize_semantic_backdoor(train_dataset, target_label, num_samples=5)
+    
+    # Initialize model
     model = ResNet18Model(num_classes=10).to(device)
+    
     options = {
-        'K': args.num_clients,
-        'C': 1.0,  # Client participation rate
-        'E': args.local_epochs,
-        'B': args.batch_size,
-        'r': args.num_rounds,
-        'lr': args.learning_rate,
+        'K': K,
+        'C': C,
+        'E': E,
+        'B': B,
+        'r': r,
+        'lr': lr,
         'clients': clients,
         'model': model,
         'device': device,
         'test_dataset': test_dataset
     }
     
+    # Train model
     server = ScaffoldServer(options)
+    print("\nTraining federated model with SCAFFOLD...")
+    server.train_round()
     
-    # Training
-    print("\nStarting federated training...")
-    for round in range(args.num_rounds):
-        loss = server.train_round()
-        if (round + 1) % 5 == 0:
-            clean_acc = server.test_global_model()
-            print(f"Round {round + 1}/{args.num_rounds}, Loss: {loss:.4f}, "
-                  f"Clean Accuracy: {clean_acc:.2f}%")
+    # Compute and visualize distribution metrics
+    if dist_type == "2":
+        monitor, class_accuracies = compute_non_iid_metrics(server.model, clients, device)
+        monitor.plot_distribution_skew()
+        monitor.plot_client_confusion_matrices()
+        plot_class_performance(class_accuracies)
+        
+        # Calculate and display additional metrics
+        skew_metrics = monitor.calculate_label_skew()
+        accuracy_gaps = monitor.calculate_local_global_accuracy_gap()
+        
+        print("\nNon-IID Analysis Results:")
+        print("Label Distribution Skew (JS Divergence):")
+        for client_id, skew in skew_metrics.items():
+            print(f"Client {client_id}: {skew:.4f}")
+        
+        print("\nLocal-Global Accuracy Gaps:")
+        for client_id, gap in accuracy_gaps.items():
+            print(f"Client {client_id}: {gap:.4f}")
     
-    # Apply defense if specified
-    if args.defense_type != 'none':
-        server.model = apply_defense(
-            server.model,
-            args.defense_type,
-            test_dataset,
+    # Evaluate model
+    clean_acc = server.test_global_model()
+    
+    if attack_type == "1":
+        backdoor_acc = evaluate_backdoor(
+            server.model, 
+            test_dataset, 
+            trigger_pattern, 
+            target_label, 
+            device
+        )
+    else:
+        backdoor_acc = evaluate_semantic_backdoor(
+            server.model, 
+            test_dataset, 
+            target_label, 
             device
         )
     
-    # Evaluate model
-    print("\nEvaluating model...")
-    results = evaluate_model(
-        server.model,
-        test_dataset,
-        trigger_pattern,
-        target_label,
-        device,
-        args.attack_type
-    )
+    print("\nOriginal Model Results:")
+    print(f"Clean Test Accuracy: {clean_acc:.2f}%")
+    print(f"Backdoor Attack Success Rate: {backdoor_acc:.2f}%")
     
-    # Print results
-    print("\nFinal Results:")
-    print(f"Clean Test Accuracy: {results['clean_accuracy']:.2f}%")
-    print(f"Backdoor Attack Success Rate: {results['attack_success_rate']:.2f}%")
-    print("\nPer-class Accuracy:")
-    for class_idx, accuracy in results['per_class_accuracy'].items():
-        print(f"Class {class_idx}: {accuracy:.2f}%")
+    if defense_type in ["1", "5"]:
+        print("\nApplying Neural Cleanse defense...")
+        cleanse = ImprovedNeuralCleanse(
+            model=server.model,
+            num_classes=10,
+            input_shape=input_shape,
+            device=device
+        )
+        
+        print("\nReverse-engineering potential triggers...")
+        cleanse.reverse_engineer_triggers(
+            max_iter=1000,
+            lr=0.01,
+            early_stop_threshold=0.99
+        )
+        
+        print("\nAnalyzing model for potential backdoors...")
+        backdoor_detected, suspected_classes, l1_norms, optimized_masks, optimized_patterns = cleanse.detect_backdoors(
+            threshold_factor=2.0
+        )
+        
+        if backdoor_detected:
+            print(f"\nBackdoor detected! Suspected target classes: {suspected_classes}")
+            
+            print("\nRepairing model...")
+            repaired_model = cleanse.repair_model(suspected_classes, optimized_masks, optimized_patterns)
+            
+            print("\nEvaluating repaired model...")
+            clean_acc_after_nc, backdoor_acc_after_nc = cleanse.evaluate_repair(
+                repaired_model, 
+                test_dataset, 
+                trigger_pattern, 
+                target_label
+            )
+            
+            server.model = repaired_model
+            
+            print("\nNeural Cleanse Defense Results:")
+            print(f"Clean Test Accuracy: Before={clean_acc:.2f}%, After={clean_acc_after_nc:.2f}%")
+            print(f"Backdoor Attack Success Rate: Before={backdoor_acc:.2f}%, After={backdoor_acc_after_nc:.2f}%")
+            print(f"Backdoor Success Reduction: {backdoor_acc - backdoor_acc_after_nc:.2f}%")
+            
+            torch.save(repaired_model.state_dict(), './output/repaired_model.pth')
+        else:
+            print("\nNo backdoor detected by Neural Cleanse.")
+        
+    # Apply Spectral Backdoor Defender if selected
+    if defense_type in ["2", "5"]:
+        print("\nApplying Spectral Backdoor Defense...")
+        
+        # Create trigger patterns dictionary for the evaluate_repair method
+        if attack_type == "1":
+            trigger_patterns = {target_label: trigger_pattern}
+            target_labels = {target_label: target_label}
+        else:
+            # For semantic backdoor, we'll pass None as we don't have explicit trigger patterns
+            trigger_patterns = None
+            target_labels = {target_label: target_label}
+        
+        # Initialize the Spectral Backdoor Defender
+        spectral_defender = SpectralBackdoorDefender(
+            model=server.model,
+            device=device,
+            num_classes=10,
+            input_shape=input_shape
+        )
+        
+        # Collect activations from layers
+        print("\nCollecting layer activations...")
+        spectral_defender.collect_layer_activations()
+        
+        # Compute eigenspectrum
+        print("\nComputing eigenspectrum...")
+        spectral_defender.compute_eigenspectrum()
+        
+        # Visualize eigenspectra
+        print("\nVisualizing eigenspectra...")
+        spectral_defender.visualize_eigenspectra()
+        
+        # Detect backdoors
+        print("\nAnalyzing model for potential backdoors using spectral analysis...")
+        backdoor_detected, compromised_layers, eigenvalue_metrics = spectral_defender.detect_backdoors(threshold_factor=2.0)
+        spectral_defender.visualize_eigenspectra()
+        spectral_defender.visualize_anomaly_metrics()
+        spectral_defender.visualize_backdoor_detection_summary(eigenvalue_metrics)
+
+        # For specific classes identified as suspicious
+        for class_idx in suspected_classes:
+            spectral_defender.visualize_activation_clusters("layer_name", class_idx)
+            spectral_defender.visualize_neuron_activations("layer_name")
+        if backdoor_detected:
+            print(f"\nBackdoor detected by spectral analysis! Compromised layers: {compromised_layers}")
+            
+            # We would need to implement the repair method in the SpectralBackdoorDefender class
+            # For now, let's assume it's implemented and use it
+            
+            # After repair, evaluate the repaired model
+            if hasattr(spectral_defender, 'repair_model'):
+                print("\nRepairing model...")
+                repaired_model = spectral_defender.repair_model(compromised_layers=compromised_layers)
+                
+                # Evaluate the repaired model
+                spectral_defender.evaluate_repair(repaired_model, test_dataset, trigger_patterns, target_labels)
+                
+                # Update server model with repaired model
+                server.model = repaired_model
+
+            else:
+                print("\nRepair method not implemented in SpectralBackdoorDefender.")
+        else:
+            print("\nNo backdoor detected by spectral analysis.")
+        
+    # Apply Fine-Pruning defense if selected
+    if defense_type in ["3", "5"]:
+        print("\nApplying Fine-Pruning defense...")
+        
+        # Initialize Fine-Pruning
+        fine_pruning = FinePruning(
+            model=copy.deepcopy(server.model),
+            clean_dataset=train_dataset,  # Using train dataset as clean data
+            device=device,
+            num_classes=10,
+            prune_ratio=0.1  # Start with pruning 10% of neurons
+        )
+        
+        # Apply the complete defense pipeline
+        defended_model = fine_pruning.defend(
+            trigger_pattern=trigger_pattern if attack_type == "1" else None,
+            target_label=target_label,
+            attack_type=attack_type,
+            fine_tuning_epochs=3  # Adjust as needed
+        )
+        
+        # Evaluate the defended model
+        clean_acc_after_fp, backdoor_acc_after_fp = fine_pruning.evaluate_defense(
+            defended_model,
+            test_dataset,
+            trigger_pattern=trigger_pattern if attack_type == "1" else None,
+            target_label=target_label,
+            attack_type=attack_type
+        )
+        
+        print("\nFine-Pruning Defended Model Results:")
+        print(f"Clean Test Accuracy: {clean_acc_after_fp:.2f}%")
+        print(f"Backdoor Attack Success Rate: {backdoor_acc_after_fp:.2f}%")
+        
+        # Update server model with defended model for potential further analysis
+        server.model = defended_model
+        
+        # Plot accuracy trends
+        server.plot_accuracies()
     
-    # Save and plot results
-    save_results(results, args, args.output_dir)
-    plot_results(results, args.output_dir)
-    
-    # Save model
-    model_path = os.path.join(args.output_dir, 'final_model.pth')
-    torch.save(server.model.state_dict(), model_path)
-    print(f"\nModel saved to {model_path}")
+    if defense_type in ["4", "5"]:
+        print("\nApplying Activation Clustering defense...")
+        
+        # Initialize the Activation Clustering defense
+        activation_clustering = ActivationClusteringDefender(
+            model=server.model,
+            dataset=train_dataset,
+            device=device,
+            num_classes=10,
+            batch_size=64
+        )
+        
+        # Collect activations from the model
+        print("\nCollecting activations from the model...")
+        sample_indices = activation_clustering.collect_activations()
+        
+        # Perform clustering analysis
+        print("\nPerforming clustering analysis...")
+        reduced_activations = activation_clustering.reduce_dimensions(method='pca', n_components=10)
+        cluster_labels = activation_clustering.perform_clustering(reduced_activations, method='kmeans', n_clusters=2)
+        
+        # Detect potential backdoors
+        print("\nDetecting potential backdoors...")
+        poisoned_classes, poison_indices = activation_clustering.analyze_clusters(reduced_activations, cluster_labels, sample_indices)
+        
+        if poisoned_classes:
+            print(f"\nBackdoor detected! Suspected poisoned classes: {poisoned_classes}")
+            
+            # Visualize the clustering results
+            print("\nVisualizing clustering results...")
+            activation_clustering.visualize_clusters(reduced_activations, cluster_labels)
+            
+            # Repair the model
+            print("\nRepairing model using clean data...")
+            repaired_model = activation_clustering.repair_model(
+                clean_dataset=train_dataset,
+                epochs=3,
+                learning_rate=0.001
+            )
+            
+            # Evaluate the repaired model
+            print("\nEvaluating repaired model...")
+            clean_acc_after_ac, backdoor_acc_after_ac = activation_clustering.evaluate_repair(
+                repaired_model,
+                test_dataset,
+                trigger_pattern=trigger_pattern if attack_type == "1" else None,
+                target_label=target_label,
+                attack_type=attack_type
+            )
+            
+            print("\nActivation Clustering Defense Results:")
+            print(f"Clean Test Accuracy: Before={clean_acc:.2f}%, After={clean_acc_after_ac:.2f}%")
+            print(f"Backdoor Success Rate: Before={backdoor_acc:.2f}%, After={backdoor_acc_after_ac:.2f}%")
+        else:
+            print("\nNo backdoor detected using Activation Clustering.")
 
 if __name__ == "__main__":
     main()
