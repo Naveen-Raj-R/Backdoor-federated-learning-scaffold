@@ -1,0 +1,133 @@
+Semantic based Backdoor Attack with Non-IID DATASET
+
+Starting training rounds...
+
+Round 1/3
+Selected clients: [0, 3]
+
+Training Client 0
+Epoch 1/10 - Training Accuracy: 66.10%
+Epoch 2/10 - Training Accuracy: 80.89%
+Epoch 3/10 - Training Accuracy: 86.84%
+Epoch 4/10 - Training Accuracy: 89.85%
+Epoch 5/10 - Training Accuracy: 91.55%
+Epoch 6/10 - Training Accuracy: 94.22%
+Epoch 7/10 - Training Accuracy: 95.48%
+Epoch 8/10 - Training Accuracy: 96.43%
+Epoch 9/10 - Training Accuracy: 97.14%
+Epoch 10/10 - Training Accuracy: 97.74%
+Client 0 Local Training Accuracy: 97.74%
+
+Training Client 3
+Epoch 1/10 - Training Accuracy: 62.05%
+Epoch 2/10 - Training Accuracy: 77.04%
+Epoch 3/10 - Training Accuracy: 82.95%
+Epoch 4/10 - Training Accuracy: 87.51%
+Epoch 5/10 - Training Accuracy: 90.28%
+Epoch 6/10 - Training Accuracy: 92.24%
+Epoch 7/10 - Training Accuracy: 93.96%
+Epoch 8/10 - Training Accuracy: 95.26%
+Epoch 9/10 - Training Accuracy: 95.40%
+Epoch 10/10 - Training Accuracy: 96.67%
+Client 3 Local Training Accuracy: 96.67%
+
+Aggregating models...
+Global Model Accuracy: 41.20%
+
+Round Summary:
+Average Local Accuracy: 97.21%
+Global Model Accuracy: 41.20%
+
+Round 2/3
+Selected clients: [3, 1]
+
+Training Client 3
+Epoch 1/10 - Training Accuracy: 86.51%
+Epoch 2/10 - Training Accuracy: 92.34%
+Epoch 3/10 - Training Accuracy: 94.80%
+Epoch 4/10 - Training Accuracy: 95.84%
+Epoch 5/10 - Training Accuracy: 96.59%
+Epoch 6/10 - Training Accuracy: 97.74%
+Epoch 7/10 - Training Accuracy: 97.60%
+Epoch 8/10 - Training Accuracy: 98.51%
+Epoch 9/10 - Training Accuracy: 98.22%
+Epoch 10/10 - Training Accuracy: 98.41%
+Client 3 Local Training Accuracy: 98.41%
+
+Training Client 1
+Epoch 1/10 - Training Accuracy: 74.78%
+Epoch 2/10 - Training Accuracy: 85.32%
+Epoch 3/10 - Training Accuracy: 89.47%
+Epoch 4/10 - Training Accuracy: 92.78%
+Epoch 5/10 - Training Accuracy: 93.98%
+Epoch 6/10 - Training Accuracy: 96.81%
+Epoch 7/10 - Training Accuracy: 97.25%
+Epoch 8/10 - Training Accuracy: 98.19%
+Epoch 9/10 - Training Accuracy: 97.78%
+Epoch 10/10 - Training Accuracy: 98.63%
+Client 1 Local Training Accuracy: 98.63%
+
+Aggregating models...
+Global Model Accuracy: 27.93%
+
+Round Summary:
+Average Local Accuracy: 98.52%
+Global Model Accuracy: 27.93%
+
+Round 3/3
+Selected clients: [0, 1]
+
+Training Client 0
+Epoch 1/10 - Training Accuracy: 84.45%
+Epoch 2/10 - Training Accuracy: 91.96%
+Epoch 3/10 - Training Accuracy: 95.61%
+Epoch 4/10 - Training Accuracy: 97.00%
+Epoch 5/10 - Training Accuracy: 96.67%
+Epoch 6/10 - Training Accuracy: 97.51%
+Epoch 7/10 - Training Accuracy: 98.31%
+Epoch 8/10 - Training Accuracy: 98.98%
+Epoch 9/10 - Training Accuracy: 99.14%
+Epoch 10/10 - Training Accuracy: 98.77%
+Client 0 Local Training Accuracy: 98.77%
+
+Training Client 1
+Epoch 1/10 - Training Accuracy: 83.83%
+Epoch 2/10 - Training Accuracy: 92.26%
+Epoch 3/10 - Training Accuracy: 95.78%
+Epoch 4/10 - Training Accuracy: 97.20%
+Epoch 5/10 - Training Accuracy: 97.23%
+Epoch 6/10 - Training Accuracy: 98.17%
+Epoch 7/10 - Training Accuracy: 97.64%
+Epoch 8/10 - Training Accuracy: 98.34%
+Epoch 9/10 - Training Accuracy: 98.49%
+Epoch 10/10 - Training Accuracy: 98.36%
+Client 1 Local Training Accuracy: 98.36%
+
+Aggregating models...
+Global Model Accuracy: 45.39%
+
+Round Summary:
+Average Local Accuracy: 98.56%
+Global Model Accuracy: 45.39%
+E:\PROJECT\Phase -2\federated-learning-scaffold\main.py:57: MatplotlibDeprecationWarning: The 'labels' parameter of boxplot() has been renamed 'tick_labels' since Matplotlib 3.9; support for the old name will be dropped in 3.11.
+  plt.boxplot(box_data, labels=[f'Class {i}' for i in range(len(class_accuracies))])
+
+Non-IID Analysis Results:
+Label Distribution Skew (JS Divergence):
+Client 0: 0.1595
+Client 1: 0.0911
+Client 2: 0.0938
+Client 3: 0.1981
+Client 4: 0.1449
+
+Local-Global Accuracy Gaps:
+Client 0: 0.2220
+Client 1: 0.1381
+Client 2: 0.1702
+Client 3: 0.1838
+Client 4: 0.2294
+Global Model Test Accuracy: 45.39%
+
+Final Results:
+Clean Test Accuracy: 45.39%
+Backdoor Attack Success Rate: 6.43%
