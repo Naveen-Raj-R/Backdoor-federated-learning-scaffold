@@ -194,8 +194,14 @@ class ActivationClusteringDefender:
             sample_indices: Dictionary with original dataset indices for each class
             
         Returns:
-            Dictionary with indices of potential poisoned samples for each class
+            tuple: (poisoned_classes, poison_indices)
+                - poisoned_classes: List of classes with potential backdoor clusters
+                - poison_indices: Dictionary with indices of potential poisoned samples for each class
         """
+        # Reset poison indices
+        self.poison_indices = {class_idx: [] for class_idx in cluster_labels.keys()}
+        poisoned_classes = []
+
         for class_idx, labels in cluster_labels.items():
             if len(labels) > 0:
                 # Count samples in each cluster
@@ -223,8 +229,12 @@ class ActivationClusteringDefender:
                             
                             # Store poisoned indices
                             self.poison_indices[class_idx].extend(potential_poison_indices)
-        
-        return self.poison_indices
+                            
+                            # Add class to poisoned classes if not already present
+                            if class_idx not in poisoned_classes:
+                                poisoned_classes.append(class_idx)
+
+        return poisoned_classes, self.poison_indices
     
     def visualize_clusters(self, reduced_activations, cluster_labels, save_path='./output/activation_clusters'):
         """
@@ -421,6 +431,112 @@ class ActivationClusteringDefender:
             else:
                 from src.utils.backdoor_sem import evaluate_semantic_backdoor
                 backdoor_acc = evaluate_semantic_backdoor(defended_model, test_dataset, target_label, self.device)
+            
+            print(f'Backdoor Attack Success Rate: {backdoor_acc:.2f}%')
+            
+            return clean_acc, backdoor_acc
+    
+        return clean_acc, None
+
+    def repair_model(self, clean_dataset, epochs=3, learning_rate=0.001):
+        """
+        Repair the model by fine-tuning on the clean dataset.
+        
+        Args:
+            clean_dataset: Dataset containing clean samples
+            epochs: Number of training epochs
+            learning_rate: Learning rate for model fine-tuning
+            
+        Returns:
+            Repaired model
+        """
+        import torch
+        import torch.optim as optim
+        import torch.nn as nn
+        from torch.utils.data import DataLoader
+        import copy
+        
+        # Create a copy of the model to avoid modifying the original
+        repaired_model = copy.deepcopy(self.model)
+        
+        # Prepare data loader
+        train_loader = DataLoader(clean_dataset, batch_size=128, shuffle=True)
+        
+        # Loss and optimizer
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(repaired_model.parameters(), lr=learning_rate)
+        
+        # Fine-tuning
+        repaired_model.train()
+        for epoch in range(epochs):
+            running_loss = 0.0
+            correct = 0
+            total = 0
+            
+            for batch_idx, (inputs, targets) in enumerate(train_loader):
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                
+                optimizer.zero_grad()
+                outputs = repaired_model(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
+                
+                running_loss += loss.item()
+                _, predicted = outputs.max(1)
+                total += targets.size(0)
+                correct += predicted.eq(targets).sum().item()
+                
+                if batch_idx % 50 == 0:
+                    print(f'Epoch: {epoch+1}, Batch: {batch_idx+1}, '
+                        f'Loss: {running_loss/(batch_idx+1):.3f}, '
+                        f'Acc: {100.*correct/total:.3f}%')
+        
+        return repaired_model
+
+    def evaluate_repair(self, repaired_model, test_dataset, trigger_pattern=None, target_label=None, attack_type="1"):
+        """
+        Evaluate the repaired model's performance.
+        
+        Args:
+            repaired_model: Model after repair
+            test_dataset: Test dataset for evaluation
+            trigger_pattern: Pattern used for backdoor attacks (if available)
+            target_label: Target label for backdoor attacks
+            attack_type: Type of attack (1 for trigger-based, 2 for semantic)
+            
+        Returns:
+            Clean accuracy and backdoor success rate
+        """
+        import torch
+        from torch.utils.data import DataLoader
+        
+        # Evaluate on clean data
+        repaired_model.eval()
+        test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+        
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for inputs, targets in test_loader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = repaired_model(inputs)
+                _, predicted = outputs.max(1)
+                total += targets.size(0)
+                correct += predicted.eq(targets).sum().item()
+        
+        clean_acc = 100. * correct / total
+        print(f'Clean Test Accuracy: {clean_acc:.2f}%')
+        
+        # Test on backdoored data if trigger is provided
+        if trigger_pattern is not None and target_label is not None:
+            if attack_type == "1":
+                from src.utils.backdoor_utils import evaluate_backdoor
+                backdoor_acc = evaluate_backdoor(repaired_model, test_dataset, trigger_pattern, target_label, self.device)
+            else:
+                from src.utils.backdoor_sem import evaluate_semantic_backdoor
+                backdoor_acc = evaluate_semantic_backdoor(repaired_model, test_dataset, target_label, self.device)
             
             print(f'Backdoor Attack Success Rate: {backdoor_acc:.2f}%')
             

@@ -343,6 +343,17 @@ class ImprovedNeuralCleanse:
                 for data, targets in test_loader:
                     data, targets = data.to(self.device), targets.to(self.device)
                     
+                    # Ensure trigger_pattern matches data tensor dimensions
+                    if trigger_pattern.dim() != data.dim():
+                        # If trigger_pattern is 1D or 2D, expand it to match data dimensions
+                        while trigger_pattern.dim() < data.dim():
+                            trigger_pattern = trigger_pattern.unsqueeze(0)
+                    
+                    # Broadcast trigger_pattern to match data tensor
+                    if trigger_pattern.shape != data.shape:
+                        trigger_pattern = trigger_pattern.expand_as(data)
+                    
+                    # Apply trigger
                     triggered_data = (1 - trigger_pattern) * data + trigger_pattern
                     
                     outputs = repaired_model(triggered_data)
